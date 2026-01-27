@@ -1,0 +1,10 @@
+.DS_Store
+.agents
+.claude
+.gemini
+.opencode
+.claude-plugin
+node_modules/
+dist/
+build/
+*.log
