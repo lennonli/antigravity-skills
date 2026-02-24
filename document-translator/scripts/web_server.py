@@ -59,8 +59,14 @@ async def translate_document(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     api_type: str = Form("gemini"),
-    target_lang: str = Form("Chinese")
+    target_lang: str = Form("Chinese"),
+    access_code: str = Form(""),
+    api_key: str = Form(None)
 ):
+    # Security check
+    if ACCESS_CODE and access_code != ACCESS_CODE:
+        return JSONResponse(status_code=401, content={"success": False, "error": "Invalid Access Code. Please enter the correct code to use this service."})
+
     # 1. Save uploaded file
     task_id = str(uuid.uuid4())
     input_path = UPLOAD_DIR / f"{task_id}_{file.filename}"
@@ -81,7 +87,7 @@ async def translate_document(
     }
     
     # 3. Queue background task
-    background_tasks.add_task(run_translation_task, task_id, input_path, output_path, api_type, target_lang)
+    background_tasks.add_task(run_translation_task, task_id, input_path, output_path, api_type, target_lang, api_key)
     
     return {
         "success": True,
