@@ -10,7 +10,7 @@ from translator import DocumentTranslator
 app = FastAPI(title="Document Translator Web UI")
 
 # Setup directories
-BASE_DIR = Path(__name__).resolve().parent.parent
+BASE_DIR = Path(__file__).resolve().parent.parent
 UPLOAD_DIR = BASE_DIR / "temp_uploads"
 UPLOAD_DIR.mkdir(exist_ok=True)
 
