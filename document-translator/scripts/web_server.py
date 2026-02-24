@@ -1,7 +1,12 @@
 import os
 import shutil
+import sys
 import uuid
 from pathlib import Path
+
+# Ensure the scripts directory is in the Python path for Hugging Face container execution
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, BackgroundTasks
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
