@@ -5,6 +5,7 @@ import subprocess
 import platform
 from pathlib import Path
 import docx
+from docx.oxml.ns import qn
 from pypdf import PdfReader
 import google.generativeai as genai
 from zhipuai import ZhipuAI
@@ -68,12 +69,56 @@ class DocumentTranslator:
         else:  # Linux
             subprocess.run(["xdg-open", file_path])
 
+    def translate_numbering(self, doc, target_lang: str):
+        try:
+            numbering_part = doc.part.numbering_part
+            if numbering_part is None:
+                return
+                
+            numbering_xml = numbering_part._element
+            lvls = numbering_xml.xpath('//w:lvl')
+            for lvl in lvls:
+                # 1. Change number format if it's a Chinese format and we are translating to non-Chinese
+                numFmt = lvl.find(qn('w:numFmt'))
+                if numFmt is not None:
+                    val = numFmt.get(qn('w:val'))
+                    chinese_fmts = ["chineseCounting", "chineseLegalCounting", "ideographTraditional", "ideographZodiac", "ideographZodiacTraditional", "taiwaneseCounting", "taiwaneseCountingThousand", "chineseCountingThousand", "chineseCountingTenThousand"]
+                    if val in chinese_fmts:
+                        if "Chinese" not in target_lang:
+                            numFmt.set(qn('w:val'), 'decimal')
+                
+                # 2. Translate prefix/suffix text
+                lvlText = lvl.find(qn('w:lvlText'))
+                if lvlText is not None:
+                    val = lvlText.get(qn('w:val'))
+                    if val:
+                        new_val = val
+                        if "Chinese" not in target_lang:
+                            # Simple heuristics for common Chinese legal/document numbering
+                            if "第" in val and "条" in val:
+                                new_val = val.replace("第", "Article ").replace("条", "").strip()
+                            elif "第" in val and "章" in val:
+                                new_val = val.replace("第", "Chapter ").replace("章", "").strip()
+                            elif "第" in val and "节" in val:
+                                new_val = val.replace("第", "Section ").replace("节", "").strip()
+                        
+                        if new_val != val:
+                            # To handle spacing nicely, e.g., 'Article %1.' we might append a dot if it lacks it and we removed Chinese chars context
+                            if new_val.endswith("%1") or new_val.endswith("%2") or new_val.endswith("%3") or new_val.endswith("%4"):
+                                new_val += "."
+                            lvlText.set(qn('w:val'), new_val)
+        except Exception as e:
+            print(f"Warning: Failed to translate numbering XML: {e}")
+
     def process(self, input_file: str, output_file: str, target_lang: str = "Chinese", skip_open: bool = False, progress_callback=None):
         suffix = Path(input_file).suffix.lower()
         
         if suffix == ".docx":
             print(f"Modifying {input_file} in-place...")
             doc = docx.Document(input_file)
+            
+            # Translate auto-numberings first
+            self.translate_numbering(doc, target_lang)
             
             # Count translatable paragraphs
             translatable_paras = [p for p in doc.paragraphs if p.text.strip()]
