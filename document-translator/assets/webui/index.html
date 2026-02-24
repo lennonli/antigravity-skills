@@ -272,6 +272,98 @@
         .download-btn:hover {
             filter: brightness(1.1);
         }
+
+        /* Progress Bar Styles */
+        .progress-container {
+            display: none;
+            width: 100%;
+            margin-top: 1.5rem;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            padding: 1.5rem;
+            text-align: center;
+        }
+
+        .progress-bar-bg {
+            width: 100%;
+            height: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 1rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .progress-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--primary), var(--accent));
+            width: 0%;
+            transition: width 0.3s ease;
+            border-radius: 4px;
+        }
+
+        /* History Styles */
+        .history-section {
+            margin-top: 3rem;
+            width: 100%;
+        }
+
+        .history-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            color: var(--text);
+            border-bottom: 1px solid var(--glass-border);
+            padding-bottom: 0.5rem;
+        }
+
+        .history-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        .history-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(15, 23, 42, 0.4);
+            padding: 1rem;
+            border-radius: 12px;
+            border: 1px solid var(--glass-border);
+            transition: all 0.2s;
+        }
+
+        .history-item:hover {
+            border-color: rgba(255, 255, 255, 0.2);
+            background: rgba(15, 23, 42, 0.6);
+        }
+
+        .history-filename {
+            font-weight: 500;
+            font-size: 0.95rem;
+            margin-bottom: 0.25rem;
+        }
+
+        .history-date {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        .history-btn {
+            background: rgba(255, 255, 255, 0.1);
+            color: var(--text);
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            text-decoration: none;
+            font-size: 0.85rem;
+            transition: background 0.2s;
+        }
+
+        .history-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
     </style>
 </head>
 
@@ -328,10 +420,28 @@
 
             <div id="status" class="status"></div>
 
+            <div id="progressContainer" class="progress-container">
+                <div style="display: flex; align-items: center; justify-content: center; gap: 10px;">
+                    <div class="loading-spinner"></div>
+                    <span id="progressStatusText">Translating...</span>
+                </div>
+                <div class="progress-bar-bg">
+                    <div id="progressBar" class="progress-bar-fill"></div>
+                </div>
+                <p id="progressPct" style="font-size: 0.85rem; font-weight: 600; color: var(--accent);">0%</p>
+            </div>
+
             <div id="successBox" class="success-box">
                 <p style="color: var(--success); font-weight: 600;">Translation Complete!</p>
                 <p id="resultFileName" style="font-size: 0.9rem; margin-top: 0.5rem; color: var(--text-muted);"></p>
                 <a id="downloadLink" href="#" class="download-btn">Download .DOCX</a>
+            </div>
+
+            <div class="history-section">
+                <h3 class="history-title">Recent Translations</h3>
+                <div id="historyList" class="history-list">
+                    <p style="color: var(--text-muted); font-size: 0.9rem;">No recent translations.</p>
+                </div>
             </div>
         </div>
     </div>
@@ -345,11 +455,43 @@
         const removeFile = document.getElementById('removeFile');
         const translateBtn = document.getElementById('translateBtn');
         const status = document.getElementById('status');
+        const progressContainer = document.getElementById('progressContainer');
+        const progressBar = document.getElementById('progressBar');
+        const progressPct = document.getElementById('progressPct');
+        const progressStatusText = document.getElementById('progressStatusText');
         const successBox = document.getElementById('successBox');
         const downloadLink = document.getElementById('downloadLink');
         const resultFileName = document.getElementById('resultFileName');
+        const historyList = document.getElementById('historyList');
 
         let selectedFile = null;
+        let pollInterval = null;
+
+        // Load History on startup
+        fetchHistory();
+
+        function fetchHistory() {
+            fetch('/history')
+                .then(res => res.json())
+                .then(data => {
+                    if (data.history && data.history.length > 0) {
+                        historyList.innerHTML = '';
+                        data.history.forEach(item => {
+                            const date = new Date(item.timestamp).toLocaleString();
+                            historyList.innerHTML += `
+                                <div class="history-item">
+                                    <div>
+                                        <div class="history-filename">${item.filename}</div>
+                                        <div class="history-date">${date}</div>
+                                    </div>
+                                    <a href="${item.download_url}" class="history-btn">Download</a>
+                                </div>
+                            `;
+                        });
+                    }
+                })
+                .catch(err => console.error("Could not fetch history", err));
+        }
 
         // File Selection Logic
         dropZone.addEventListener('click', () => fileInput.click());
@@ -412,8 +554,12 @@
             formData.append('target_lang', targetLang);
 
             translateBtn.disabled = true;
-            status.innerHTML = '<div style="display: flex; align-items: center; justify-content: center; gap: 10px;"><div class="loading-spinner"></div> Translating... this may take a moment.</div>';
+            status.innerHTML = '';
             successBox.style.display = 'none';
+            progressContainer.style.display = 'block';
+            progressBar.style.width = '0%';
+            progressPct.textContent = '0%';
+            progressStatusText.textContent = 'Uploading...';
 
             try {
                 const response = await fetch('/translate', {
@@ -424,19 +570,55 @@
                 const result = await response.json();
 
                 if (result.success) {
-                    status.innerHTML = '<span style="color: var(--success);">✔ Success!</span>';
-                    successBox.style.display = 'block';
-                    resultFileName.textContent = result.filename;
-                    downloadLink.href = result.download_url;
+                    progressStatusText.textContent = 'Translating...';
+                    pollProgress(result.task_id);
                 } else {
+                    progressContainer.style.display = 'none';
                     status.innerHTML = `<span style="color: var(--error);">✖ Error: ${result.error}</span>`;
                     translateBtn.disabled = false;
                 }
             } catch (error) {
+                progressContainer.style.display = 'none';
                 status.innerHTML = `<span style="color: var(--error);">✖ Connection failed: ${error.message}</span>`;
                 translateBtn.disabled = false;
             }
         });
+
+        function pollProgress(taskId) {
+            if (pollInterval) clearInterval(pollInterval);
+
+            pollInterval = setInterval(async () => {
+                try {
+                    const res = await fetch(`/progress/${taskId}`);
+                    const data = await res.json();
+
+                    if (data.status === 'processing') {
+                        progressBar.style.width = `${data.progress}%`;
+                        progressPct.textContent = `${data.progress.toFixed(1)}%`;
+                    } else if (data.status === 'completed') {
+                        clearInterval(pollInterval);
+                        progressBar.style.width = `100%`;
+                        progressPct.textContent = `100%`;
+
+                        setTimeout(() => {
+                            progressContainer.style.display = 'none';
+                            successBox.style.display = 'block';
+                            resultFileName.textContent = data.filename;
+                            downloadLink.href = data.download_url;
+                            translateBtn.disabled = false;
+                            fetchHistory(); // Refresh history
+                        }, 500);
+                    } else if (data.status === 'error') {
+                        clearInterval(pollInterval);
+                        progressContainer.style.display = 'none';
+                        status.innerHTML = `<span style="color: var(--error);">✖ Error: ${data.error}</span>`;
+                        translateBtn.disabled = false;
+                    }
+                } catch (err) {
+                    console.error("Polling error", err);
+                }
+            }, 2000); // Poll every 2 seconds
+        }
     </script>
 </body>
 

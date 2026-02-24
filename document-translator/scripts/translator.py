@@ -40,38 +40,7 @@ class DocumentTranslator:
             for page in reader.pages:
                 text += page.extract_text() + "\n"
             return text
-        else:
             raise ValueError(f"Unsupported file format: {suffix}")
-
-    def extract_docx_with_format(self, file_path: str) -> List[dict]:
-        doc = docx.Document(file_path)
-        data = []
-        for p in doc.paragraphs:
-            para_data = {
-                "text": p.text,
-                "alignment": p.alignment,
-                "style": p.style.name if p.style else None,
-                "paragraph_format": {
-                    "line_spacing": p.paragraph_format.line_spacing,
-                    "space_before": p.paragraph_format.space_before,
-                    "space_after": p.paragraph_format.space_after,
-                    "left_indent": p.paragraph_format.left_indent,
-                },
-                "runs": []
-            }
-            if p.runs:
-                # We'll take the first run's formatting as a representative for the paragraph
-                # because splitting translated text back into multiple formatted runs is unreliable.
-                first_run = p.runs[0]
-                para_data["font_format"] = {
-                    "name": first_run.font.name,
-                    "size": first_run.font.size,
-                    "bold": first_run.bold,
-                    "italic": first_run.italic,
-                    "color": first_run.font.color.rgb if first_run.font.color else None
-                }
-            data.append(para_data)
-        return data
 
     def translate_text(self, text: str, target_lang: str = "Chinese") -> str:
         if not text.strip():
@@ -91,34 +60,6 @@ class DocumentTranslator:
             return response.choices[0].message.content.strip()
         return ""
 
-    def save_formatted_docx(self, formatted_data: List[dict], output_path: str):
-        doc = docx.Document()
-        for item in formatted_data:
-            p = doc.add_paragraph(item["translated_text"])
-            
-            # Application of paragraph formatting
-            if item["alignment"] is not None:
-                p.alignment = item["alignment"]
-            
-            fmt = item["paragraph_format"]
-            p.paragraph_format.line_spacing = fmt["line_spacing"]
-            p.paragraph_format.space_before = fmt["space_before"]
-            p.paragraph_format.space_after = fmt["space_after"]
-            p.paragraph_format.left_indent = fmt["left_indent"]
-            
-            # Application of font formatting (to the whole translated paragraph for consistency)
-            if "font_format" in item:
-                run = p.runs[0]
-                ff = item["font_format"]
-                run.font.name = ff["name"]
-                run.font.size = ff["size"]
-                run.bold = ff["bold"]
-                run.italic = ff["italic"]
-                if ff["color"]:
-                    run.font.color.rgb = ff["color"]
-                    
-        doc.save(output_path)
-
     def open_file(self, file_path: str):
         if platform.system() == "Darwin":  # macOS
             subprocess.run(["open", file_path])
@@ -127,33 +68,88 @@ class DocumentTranslator:
         else:  # Linux
             subprocess.run(["xdg-open", file_path])
 
-    def process(self, input_file: str, output_file: str, target_lang: str = "Chinese", skip_open: bool = False):
+    def process(self, input_file: str, output_file: str, target_lang: str = "Chinese", skip_open: bool = False, progress_callback=None):
         suffix = Path(input_file).suffix.lower()
         
         if suffix == ".docx":
-            print(f"Extracting formatted text from {input_file}...")
-            paras = self.extract_docx_with_format(input_file)
+            print(f"Modifying {input_file} in-place...")
+            doc = docx.Document(input_file)
             
-            print(f"Translating paragraphs using {self.api_type} (this may take a while for large docs)...")
-            for i, para in enumerate(paras):
-                if para["text"].strip():
-                    print(f"  Translating paragraph {i+1}/{len(paras)}...")
-                    para["translated_text"] = self.translate_text(para["text"], target_lang)
-                else:
-                    para["translated_text"] = para["text"]
+            # Count translatable paragraphs
+            translatable_paras = [p for p in doc.paragraphs if p.text.strip()]
+            total_paras = len(translatable_paras)
             
+            print(f"Translating {total_paras} paragraphs using {self.api_type}...")
+            
+            processed_count = 0
+            for p in doc.paragraphs:
+                original_text = p.text
+                if original_text.strip():
+                    processed_count += 1
+                    print(f"  Translating paragraph {processed_count}/{total_paras}...")
+                    
+                    translated_text = self.translate_text(original_text, target_lang)
+                    
+                    # Clear runs and add translated text to the first run to preserve paragraph style
+                    # If no runs exist, just append text
+                    if p.runs:
+                        p.runs[0].text = translated_text
+                        for i in range(1, len(p.runs)):
+                            p.runs[i].text = ""
+                    else:
+                        p.add_run(translated_text)
+                        
+                    if progress_callback:
+                        progress_callback(processed_count, total_paras)
+            
+            # Also process tables
+            # This is a basic implementation. For nested tables, recursion would be needed.
+            table_cells = []
+            for table in doc.tables:
+                for row in table.rows:
+                    for cell in row.cells:
+                        if cell.text.strip():
+                            table_cells.append(cell)
+            
+            total_cells = len(table_cells)
+            if total_cells > 0:
+                print(f"Translating {total_cells} table cells...")
+                cell_count = 0
+                for cell in table_cells:
+                    cell_count += 1
+                    print(f"  Translating cell {cell_count}/{total_cells}...")
+                    
+                    original_text = cell.text
+                    translated_text = self.translate_text(original_text, target_lang)
+                    
+                    if cell.paragraphs and cell.paragraphs[0].runs:
+                        cell.paragraphs[0].runs[0].text = translated_text
+                        for i in range(1, len(cell.paragraphs[0].runs)):
+                            cell.paragraphs[0].runs[i].text = ""
+                    else:
+                        cell.text = translated_text
+                        
+                    if progress_callback:
+                        # Continue progress bar after paragraphs
+                        progress_callback(processed_count + cell_count, total_paras + total_cells)
+                        
             print(f"Saving formatted translation to {output_file}...")
-            self.save_formatted_docx(paras, output_file)
+            doc.save(output_file)
             
         else:
             print(f"Extracting raw text from {input_file}...")
             text = self.extract_text(input_file)
             
+            if progress_callback:
+                progress_callback(0, 1) # Started
+                
             print(f"Translating using {self.api_type}...")
             translated_text = self.translate_text(text, target_lang)
             
+            if progress_callback:
+                progress_callback(1, 1) # Done
+            
             print(f"Saving translation to {output_file}...")
-            # For non-docx, we use a simple save
             doc = docx.Document()
             for p_text in translated_text.split("\n"):
                 if p_text.strip():
