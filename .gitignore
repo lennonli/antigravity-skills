@@ -8,3 +8,8 @@ node_modules/
 dist/
 build/
 *.log
+*.zip
+__pycache__/
+.venv/
+env/
+.env
