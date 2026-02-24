@@ -13,11 +13,19 @@ The skill requires at least one of the following environment variables to be set
 - `GOOGLE_API_KEY`: Required for Gemini translation.
 - `ZHIPU_API_KEY`: Required for Zhipu AI (ChatGLM) translation.
 
-## Usage
+## Web UI
 
-To translate a document, call the `scripts/translator.py` script.
+You can also use a graphical interface to translate documents.
 
-### Command Format
+### Starting the Web UI
+```bash
+python3 scripts/web_server.py
+```
+Then open your browser to `http://127.0.0.1:8000`.
+
+## Command Line Usage
+
+To translate a document via CLI, call the `scripts/translator.py` script.
 
 ```bash
 python3 scripts/translator.py <input_file> [--output <output_file>] [--api <gemini|zhipu>] [--lang <target_language>]

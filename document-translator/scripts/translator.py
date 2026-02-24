@@ -127,7 +127,7 @@ class DocumentTranslator:
         else:  # Linux
             subprocess.run(["xdg-open", file_path])
 
-    def process(self, input_file: str, output_file: str, target_lang: str = "Chinese"):
+    def process(self, input_file: str, output_file: str, target_lang: str = "Chinese", skip_open: bool = False):
         suffix = Path(input_file).suffix.lower()
         
         if suffix == ".docx":
@@ -160,8 +160,9 @@ class DocumentTranslator:
                     doc.add_paragraph(p_text.strip())
             doc.save(output_file)
         
-        print(f"Opening {output_file}...")
-        self.open_file(output_file)
+        if not skip_open:
+            print(f"Opening {output_file}...")
+            self.open_file(output_file)
         print("Done!")
 
 if __name__ == "__main__":

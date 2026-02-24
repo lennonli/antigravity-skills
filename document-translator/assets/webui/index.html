@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DocTranslate Pro | Universal Document Translator</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;600;800&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --primary: #6366f1;
+            --primary-hover: #4f46e5;
+            --bg: #0f172a;
+            --surface: rgba(30, 41, 59, 0.7);
+            --text: #f8fafc;
+            --text-muted: #94a3b8;
+            --accent: #06b6d4;
+            --error: #ef4444;
+            --success: #10b981;
+            --glass-border: rgba(255, 255, 255, 0.1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Inter', sans-serif;
+        }
+
+        body {
+            background-color: var(--bg);
+            background-image:
+                radial-gradient(circle at 0% 0%, rgba(99, 102, 241, 0.15) 0%, transparent 50%),
+                radial-gradient(circle at 100% 100%, rgba(6, 182, 212, 0.15) 0%, transparent 50%);
+            color: var(--text);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            overflow-x: hidden;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 600px;
+            padding: 2rem;
+            z-index: 10;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 3rem;
+            animation: fadeInDown 0.8s ease-out;
+        }
+
+        h1 {
+            font-family: 'Outfit', sans-serif;
+            font-size: 3.5rem;
+            font-weight: 800;
+            letter-spacing: -0.02em;
+            margin-bottom: 0.5rem;
+            background: linear-gradient(135deg, #fff 0%, #94a3b8 100%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        p.subtitle {
+            color: var(--text-muted);
+            font-size: 1.1rem;
+        }
+
+        .card {
+            background: var(--surface);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--glass-border);
+            border-radius: 24px;
+            padding: 2.5rem;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            animation: scaleIn 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .drop-zone {
+            border: 2px dashed var(--glass-border);
+            border-radius: 16px;
+            padding: 3rem 2rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-bottom: 2rem;
+            position: relative;
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        .drop-zone:hover,
+        .drop-zone.drag-over {
+            border-color: var(--primary);
+            background: rgba(99, 102, 241, 0.05);
+        }
+
+        .drop-zone-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            display: block;
+        }
+
+        .options {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        label {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        select,
+        input {
+            background: rgba(15, 23, 42, 0.5);
+            border: 1px solid var(--glass-border);
+            border-radius: 12px;
+            padding: 0.75rem 1rem;
+            color: var(--text);
+            font-size: 1rem;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        select:focus {
+            border-color: var(--primary);
+        }
+
+        .btn {
+            width: 100%;
+            background: linear-gradient(135deg, var(--primary) 0%, #4338ca 100%);
+            color: white;
+            border: none;
+            border-radius: 14px;
+            padding: 1.25rem;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 10px 15px -3px rgba(99, 102, 241, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.75rem;
+        }
+
+        .btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 20px 25px -5px rgba(99, 102, 241, 0.4);
+        }
+
+        .btn:active:not(:disabled) {
+            transform: translateY(0);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            background: #475569;
+            box-shadow: none;
+        }
+
+        .status {
+            margin-top: 1.5rem;
+            text-align: center;
+            font-size: 0.95rem;
+            min-height: 1.5rem;
+        }
+
+        .loading-spinner {
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        @keyframes fadeInDown {
+            from {
+                opacity: 0;
+                transform: translateY(-20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes scaleIn {
+            from {
+                opacity: 0;
+                transform: scale(0.95);
+            }
+
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        .file-info {
+            display: none;
+            align-items: center;
+            gap: 1rem;
+            background: rgba(255, 255, 255, 0.05);
+            padding: 1rem;
+            border-radius: 12px;
+            margin-bottom: 2rem;
+        }
+
+        .success-box {
+            display: none;
+            background: rgba(16, 185, 129, 0.1);
+            border: 1px solid var(--success);
+            padding: 1.5rem;
+            border-radius: 16px;
+            text-align: center;
+            margin-top: 2rem;
+            animation: fadeIn 0.4s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+
+            to {
+                opacity: 1;
+            }
+        }
+
+        .download-btn {
+            background: var(--success);
+            color: white;
+            text-decoration: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 10px;
+            display: inline-block;
+            margin-top: 1rem;
+            font-weight: 600;
+            transition: filter 0.2s;
+        }
+
+        .download-btn:hover {
+            filter: brightness(1.1);
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <h1>DocTranslate</h1>
+            <p class="subtitle">Premium AI Document Translation</p>
+        </header>
+
+        <div class="card">
+            <div id="dropZone" class="drop-zone">
+                <span class="drop-zone-icon">📄</span>
+                <p id="dropText">Drag and drop file here or click to browse</p>
+                <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.5rem;">PDF, DOCX, MD, TXT supported
+                </p>
+                <input type="file" id="fileInput" hidden accept=".pdf,.docx,.txt,.md">
+            </div>
+
+            <div id="fileInfo" class="file-info">
+                <span style="font-size: 1.5rem;">📎</span>
+                <div style="flex: 1;">
+                    <p id="fileName" style="font-weight: 600; font-size: 0.9rem;"></p>
+                    <p id="fileSize" style="font-size: 0.8rem; color: var(--text-muted);"></p>
+                </div>
+                <button id="removeFile"
+                    style="background: none; border: none; color: var(--error); cursor: pointer; font-size: 1.2rem;">&times;</button>
+            </div>
+
+            <div class="options">
+                <div class="input-group">
+                    <label>Engine</label>
+                    <select id="apiType">
+                        <option value="gemini">Google Gemini</option>
+                        <option value="zhipu">Zhipu AI (GLM)</option>
+                    </select>
+                </div>
+                <div class="input-group">
+                    <label>Target Language</label>
+                    <select id="targetLang">
+                        <option value="Chinese">Chinese (Simplified)</option>
+                        <option value="English">English</option>
+                        <option value="Japanese">Japanese</option>
+                        <option value="Korean">Korean</option>
+                        <option value="French">French</option>
+                        <option value="German">German</option>
+                    </select>
+                </div>
+            </div>
+
+            <button id="translateBtn" class="btn" disabled>
+                <span>Translate Document</span>
+            </button>
+
+            <div id="status" class="status"></div>
+
+            <div id="successBox" class="success-box">
+                <p style="color: var(--success); font-weight: 600;">Translation Complete!</p>
+                <p id="resultFileName" style="font-size: 0.9rem; margin-top: 0.5rem; color: var(--text-muted);"></p>
+                <a id="downloadLink" href="#" class="download-btn">Download .DOCX</a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('fileInput');
+        const fileInfo = document.getElementById('fileInfo');
+        const fileName = document.getElementById('fileName');
+        const fileSize = document.getElementById('fileSize');
+        const removeFile = document.getElementById('removeFile');
+        const translateBtn = document.getElementById('translateBtn');
+        const status = document.getElementById('status');
+        const successBox = document.getElementById('successBox');
+        const downloadLink = document.getElementById('downloadLink');
+        const resultFileName = document.getElementById('resultFileName');
+
+        let selectedFile = null;
+
+        // File Selection Logic
+        dropZone.addEventListener('click', () => fileInput.click());
+
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFile(e.target.files[0]);
+            }
+        });
+
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('drag-over');
+        });
+
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.classList.remove('drag-over');
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('drag-over');
+            if (e.dataTransfer.files.length > 0) {
+                handleFile(e.dataTransfer.files[0]);
+            }
+        });
+
+        function handleFile(file) {
+            selectedFile = file;
+            fileName.textContent = file.name;
+            fileSize.textContent = (file.size / 1024).toFixed(1) + ' KB';
+
+            dropZone.style.display = 'none';
+            fileInfo.style.display = 'flex';
+            translateBtn.disabled = false;
+            successBox.style.display = 'none';
+            status.innerHTML = '';
+        }
+
+        removeFile.addEventListener('click', (e) => {
+            e.stopPropagation();
+            selectedFile = null;
+            fileInput.value = '';
+            dropZone.style.display = 'block';
+            fileInfo.style.display = 'none';
+            translateBtn.disabled = true;
+            status.innerHTML = '';
+        });
+
+        // Translation Logic
+        translateBtn.addEventListener('click', async () => {
+            if (!selectedFile) return;
+
+            const apiType = document.getElementById('apiType').value;
+            const targetLang = document.getElementById('targetLang').value;
+
+            const formData = new FormData();
+            formData.append('file', selectedFile);
+            formData.append('api_type', apiType);
+            formData.append('target_lang', targetLang);
+
+            translateBtn.disabled = true;
+            status.innerHTML = '<div style="display: flex; align-items: center; justify-content: center; gap: 10px;"><div class="loading-spinner"></div> Translating... this may take a moment.</div>';
+            successBox.style.display = 'none';
+
+            try {
+                const response = await fetch('/translate', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    status.innerHTML = '<span style="color: var(--success);">✔ Success!</span>';
+                    successBox.style.display = 'block';
+                    resultFileName.textContent = result.filename;
+                    downloadLink.href = result.download_url;
+                } else {
+                    status.innerHTML = `<span style="color: var(--error);">✖ Error: ${result.error}</span>`;
+                    translateBtn.disabled = false;
+                }
+            } catch (error) {
+                status.innerHTML = `<span style="color: var(--error);">✖ Connection failed: ${error.message}</span>`;
+                translateBtn.disabled = false;
+            }
+        });
+    </script>
+</body>
+
+</html>
